@@ -8,15 +8,13 @@ Unless otherwise stated, all hyperparameters were kept unchanged between compare
 
 ## 1. Single-Q vs Double-Q
 
-Standard SAC uses two critics and takes the minimum value
+Standard SAC uses two critics and takes the smaller estimate when computing the critic target and actor objective:
 
-\[
-\min(Q_1,Q_2)
-\]
+```math
+\min(Q_1, Q_2)
+```
 
-when constructing the target and updating the actor.
-
-To test the effect of this design, I compared the standard Double-Q version with a Single-Q version.
+I compared the standard Double-Q implementation with a Single-Q variant.
 
 ### Evaluation return
 
@@ -24,133 +22,142 @@ To test the effect of this design, I compared the standard Double-Q version with
 
 Double-Q performs better overall across the three seeds.
 
-Single-Q can still learn, but its performance is less consistent and generally lower than the standard Double-Q implementation.
+Single-Q can still learn, but its performance is generally lower and less consistent.
 
 ### Critic values
 
 ![Single-Q vs Double-Q critic](Q_critic_q1.png)
 
-The Single-Q runs tend to produce larger Q-values than the Double-Q runs, especially later in training.
+Single-Q tends to produce larger critic values, especially later in training.
 
-Interestingly, the higher critic values do not correspond to higher evaluation returns.
+However, the larger Q-values do not correspond to better evaluation return.
 
-This is consistent with the motivation for clipped Double-Q learning: using a single critic makes optimistic value estimates more likely to affect the policy and the bootstrapped target.
+This is consistent with the motivation for clipped Double-Q learning: a single critic is more vulnerable to optimistic value estimates, while taking the minimum of two critics gives a more conservative estimate.
 
-This experiment does not directly measure Q-value bias against Monte-Carlo returns, so I treat this as evidence consistent with overestimation rather than a direct measurement of it.
+This experiment does not directly compare Q-values with Monte-Carlo returns, so it should not be treated as a direct measurement of overestimation.
 
-### Takeaway
+### Conclusion
 
-For this HalfCheetah experiment, the standard Double-Q design gives more reliable learning and better policy performance.
+For this HalfCheetah experiment, Double-Q gives more reliable learning and better policy performance than Single-Q.
 
 ---
 
 ## 2. Fixed Alpha vs Automatic Alpha
 
-SAC trades off reward maximization and policy entropy through the temperature parameter
-
-\[
-\alpha.
-\]
+SAC uses the temperature parameter $\alpha$ to control the weight of the entropy term.
 
 I compared:
 
-- fixed \(\alpha = 0.2\)
-- automatically learned \(\alpha\), initialized at \(0.2\)
+- fixed $\alpha = 0.2$
+- automatic alpha, initialized at $0.2$
 
-All other settings were kept the same.
+All other settings were unchanged.
 
-For HalfCheetah, the action dimension is 6, so the target entropy is
+HalfCheetah has a 6-dimensional action space, so the target entropy used by the implementation is
 
-\[
-\mathcal H_{\text{target}} = -6.
-\]
+```math
+\mathcal{H}_{\text{target}} = -6
+```
 
 ### Evaluation return
 
 ![Fixed vs automatic alpha return](alpha_eval_return_mean.png)
 
-Automatic alpha gives more consistent learning across seeds.
+Automatic alpha gives more consistent learning across the three seeds.
 
-All three automatic-alpha runs reach strong final performance, while the fixed-alpha runs show much larger variation.
+The fixed-alpha runs show much larger variation. Two seeds eventually reach reasonable performance, while one seed remains far below the automatic-alpha runs even after 100k environment steps.
 
-Two fixed-alpha seeds eventually reach reasonable performance, but one run learns much more slowly and remains far below the other runs even at 100k steps.
+The difference is therefore visible not only in final performance, but also in sample efficiency and robustness across seeds.
 
-The main difference is therefore not only final return, but also training robustness and sample efficiency.
-
-### Alpha during training
+### Alpha
 
 ![Alpha](alpha.png)
 
-For the fixed-alpha runs,
+For the fixed-alpha experiments,
 
-\[
+```math
 \alpha = 0.2
-\]
+```
 
 throughout training.
 
-For automatic-alpha SAC, alpha changes substantially over time.
+With automatic temperature tuning, alpha changes substantially during training.
 
-It starts from 0.2, quickly decreases during the early stage of training, reaches a very small value around 15k–20k steps, and then gradually increases again.
+It starts at $0.2$, quickly decreases during the early stage, reaches a very small value around 15k–20k steps, and then gradually increases again.
 
-The final value also differs between seeds.
+The final alpha value also differs between seeds.
 
-This shows that the entropy weight preferred by the policy is not constant during training.
+This shows that the entropy weight used by SAC is not constant over the course of training.
 
 ### Policy entropy
 
 ![Policy entropy](entropy.png)
 
-This is the clearest difference between the two variants.
+This plot shows the clearest difference between the two variants.
 
-With automatic alpha, policy entropy quickly approaches approximately
+With automatic alpha, the policy entropy quickly approaches
 
-\[
--6,
-\]
+```math
+\mathcal{H}(\pi) \approx -6
+```
 
-and stays close to the target entropy for the rest of training.
+and then remains close to the target entropy.
 
-With fixed \(\alpha=0.2\), entropy remains much higher and varies substantially between seeds.
+With fixed $\alpha = 0.2$, the policy entropy stays much higher and varies significantly between seeds.
 
-The fixed value therefore applies too much entropy pressure for this setting and prevents the policy entropy from approaching the target value.
+In this experiment, keeping alpha fixed at $0.2$ therefore applies too much entropy regularization for much of training, while automatic temperature tuning adjusts the regularization strength to keep policy entropy near the target.
 
-Automatic temperature tuning instead adjusts alpha according to the current policy and keeps entropy near the desired level.
+### Conclusion
 
-### Takeaway
+Automatic temperature tuning is not simply searching for one better constant value of alpha.
 
-The main benefit of automatic alpha in this experiment is not simply that it finds a "better constant alpha".
+Instead, alpha changes throughout training as part of a feedback process:
 
-Instead, alpha changes throughout training in order to regulate policy entropy.
+```text
+policy entropy
+      ↓
+alpha update
+      ↓
+entropy regularization strength
+      ↓
+policy entropy
+```
 
-The experiment shows the full feedback loop:
-
-\[
-\text{policy entropy}
-\rightarrow
-\alpha \text{ update}
-\rightarrow
-\text{entropy regularization strength}
-\rightarrow
-\text{policy entropy}.
-\]
-
-For HalfCheetah, automatic temperature tuning produces much more controlled entropy and more reliable training than keeping \(\alpha=0.2\) fixed.
+For HalfCheetah, this produces much more controlled policy entropy and more consistent learning than keeping $\alpha = 0.2$ fixed.
 
 ---
 
-## Current Summary
+## Summary
 
-So far, the experiments support two important SAC design choices:
+The experiments so far support two important components of SAC.
 
-1. **Double-Q critics**
+### Double-Q
 
-   Using two critics and the minimum estimate gives better learning behavior than the Single-Q variant and reduces the effect of optimistic critic estimates.
+Using two critics and the conservative estimate
 
-2. **Automatic temperature tuning**
+```math
+\min(Q_1,Q_2)
+```
 
-   A fixed entropy coefficient does not maintain the desired policy entropy throughout training. Learning alpha automatically keeps the entropy near the target and improves robustness across seeds.
+produces better and more reliable learning than the Single-Q variant.
 
-These experiments complete the main SAC ablations used in this project.
+Single-Q also tends to produce larger critic values without achieving higher returns, which is consistent with more optimistic value estimation.
 
-Next, I will investigate the effect of the update-to-data ratio before moving on to REDQ.
+### Automatic temperature tuning
+
+Automatic alpha keeps policy entropy close to the target
+
+```math
+\mathcal{H}_{\text{target}} = -6
+```
+
+while fixed $\alpha = 0.2$ produces substantially higher and less consistent entropy.
+
+The automatic-alpha runs also show more reliable policy learning across seeds.
+
+---
+
+## Next
+
+- UTD experiments
+- REDQ reproduction
