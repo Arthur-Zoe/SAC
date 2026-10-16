@@ -103,9 +103,9 @@ done
 
 Standard SAC uses two critics and the conservative estimate
 
-\[
-\min(Q_1,Q_2)
-\]
+```math
+min(Q_1,Q_2)
+```
 
 for both the Bellman target and the actor objective.
 
