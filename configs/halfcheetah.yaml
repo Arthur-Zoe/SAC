@@ -1,0 +1,26 @@
+# Starting configuration only; copied hyperparameters, not a tuned benchmark.
+env_name: HalfCheetah-v5
+seed: 42
+total_steps: 100000
+buffer_size: 100000
+batch_size: 256
+gamma: 0.99
+tau: 0.005
+learning_rate: 0.0003
+start_steps: 5000
+update_after: 1000
+updates_per_step: 1
+eval_interval: 5000
+eval_episodes: 20
+init_alpha: 0.2
+auto_alpha: true
+double_q: true
+hidden_dim: 256
+eval_seed_start: 1000
+log_interval: 100
+device: auto
+torch_threads: 1
+wandb_project: sac-reproduction
+wandb_mode: offline
+wandb_group: baseline
+output_dir: runs
