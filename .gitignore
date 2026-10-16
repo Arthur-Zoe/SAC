@@ -5,3 +5,4 @@ __pycache__/
 .venv/
 runs/
 wandb/
+MUJOCO_LOG/MUJOCO_LOG.TXT
